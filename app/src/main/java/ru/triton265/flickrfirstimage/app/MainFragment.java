@@ -9,6 +9,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -16,7 +17,6 @@ import com.annimon.stream.Collectors;
 import com.annimon.stream.Stream;
 import com.bumptech.glide.Glide;
 import rx.Observable;
-import rx.Scheduler;
 import rx.Subscriber;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
@@ -25,10 +25,13 @@ import rx.schedulers.Schedulers;
 import java.io.IOException;
 import java.util.List;
 
-public class MainFragment extends Fragment {
+class MainFragment extends Fragment {
+    private static final String EXTRA_IMAGE_URL = "EXTRA_IMAGE_URL";
+
 
     private Subscription mSubscription;
     private ImageView mImageView;
+    private String mImageUrl;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -42,17 +45,32 @@ public class MainFragment extends Fragment {
         final View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
         mImageView = (ImageView)rootView.findViewById(R.id.imageView);
+        if (null != savedInstanceState) {
+            mImageUrl = savedInstanceState.getString(EXTRA_IMAGE_URL);
+            setImage(mImageUrl);
+        }
 
         final EditText editText = (EditText)rootView.findViewById(R.id.editText);
         editText.setOnKeyListener((View v, int keyCode, KeyEvent event) -> {
             if ((event.getAction() == KeyEvent.ACTION_DOWN) && (keyCode == KeyEvent.KEYCODE_ENTER)) {
                 findImage(((EditText) v).getText().toString());
+                // Hide soft keyboard.
+                final InputMethodManager imm
+                        = (InputMethodManager)getActivity().getSystemService(getActivity().INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(v.getApplicationWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
                 return true;
             }
             return false;
         });
 
         return rootView;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        outState.putString(EXTRA_IMAGE_URL, mImageUrl);
     }
 
     @Override
@@ -89,7 +107,7 @@ public class MainFragment extends Fragment {
     private void findImage(@NonNull final String searchText) {
         mSubscription = createSearchObservable(searchText)
                 .subscribeOn(Schedulers.io())
-                .flatMap(phoneId -> createImageSizesObservable(phoneId))
+                .flatMap(this::createImageSizesObservable)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                         sizeList -> {
@@ -98,15 +116,20 @@ public class MainFragment extends Fragment {
                                     .collect(Collectors.toList());
 
                             if (null != medium && medium.size() > 0) {
-                                Glide.with(MainFragment.this)
-                                        .load(medium.get(0).source)
-                                        .centerCrop()
-                                        .placeholder(android.R.drawable.progress_indeterminate_horizontal)
-                                        .into(mImageView);
+                                mImageUrl = medium.get(0).source;
+                                setImage(mImageUrl);
                             }
                         },
                         e -> {
                             Toast.makeText(getActivity(), R.string.error_get_image, Toast.LENGTH_SHORT).show();
                         });
+    }
+
+    private void setImage(@NonNull String imageUrl) {
+        Glide.with(MainFragment.this)
+                .load(imageUrl)
+                .centerCrop()
+                .placeholder(android.R.drawable.stat_sys_download)
+                .into(mImageView);
     }
 }

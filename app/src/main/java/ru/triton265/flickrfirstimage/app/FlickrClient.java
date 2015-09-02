@@ -13,10 +13,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class FlickrClient {
+class FlickrClient {
     private static final String FLICKR_BASEURL = "https://api.flickr.com";
 
-    private static Map<String, String> OPTIONS = new HashMap<String, String>();
+    private static final Map<String, String> OPTIONS = new HashMap<>();
 
     static {
         OPTIONS.put("api_key", "96635d88513246ce894292de45c8f704");
