@@ -1,21 +1,33 @@
 package ru.triton265.flickrfirstimage.app;
 
 import android.text.TextUtils;
+import com.annimon.stream.Collectors;
+import com.annimon.stream.Stream;
 import junit.framework.TestCase;
-import retrofit.Callback;
-import retrofit.Response;
 
 import java.io.IOException;
+import java.util.List;
 
 public class FlickrClientTest extends TestCase {
 
     public void testSearch() throws IOException {
-        FlickrClient.FlickrService.SearchResult result = FlickrClient.search("ass");
+        final String id = FlickrClient.searchFirst("ass");
 
-        assertNotNull(result);
-        assertEquals("ok", result.stat);
-        assertTrue(result.photos.total > 0);
-        assertNotNull(result.photos.photo);
-        assertFalse(TextUtils.isEmpty(result.photos.photo.get(0).id));
+        assertFalse(TextUtils.isEmpty(id));
+    }
+
+    public void testGetSizes() throws IOException {
+        final String photoId = FlickrClient.searchFirst("ass");
+        final List<FlickrClient.Service.Size> sizeList = FlickrClient.getSizes(photoId);
+
+        assertNotNull(sizeList);
+        assertTrue(sizeList.size() > 0);
+
+        final List<FlickrClient.Service.Size> medium = Stream.of(sizeList)
+                .filter(size -> "Medium".equals(size.label))
+                .collect(Collectors.toList());
+
+        assertNotNull(medium);
+        assertTrue(medium.size() > 0);
     }
 }

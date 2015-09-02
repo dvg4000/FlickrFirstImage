@@ -2,7 +2,6 @@ package ru.triton265.flickrfirstimage.app;
 
 import android.support.annotation.NonNull;
 import retrofit.Call;
-import retrofit.Callback;
 import retrofit.GsonConverterFactory;
 import retrofit.Retrofit;
 import retrofit.http.GET;
@@ -11,6 +10,7 @@ import retrofit.http.QueryMap;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class FlickrClient {
@@ -24,9 +24,12 @@ public class FlickrClient {
         OPTIONS.put("nojsoncallback", "1");
     }
 
-    public interface FlickrService {
+    interface Service {
         @GET("/services/rest")
-        Call<SearchResult> searchFlickr(@QueryMap Map<String, String> options);
+        Call<SearchResult> search(@QueryMap Map<String, String> options);
+
+        @GET("/services/rest")
+        Call<GetSizesResult> getSizes(@QueryMap Map<String, String> options);
 
         class Photo {
             String id;
@@ -41,10 +44,26 @@ public class FlickrClient {
             Photos photos;
             String stat;
         }
+
+        class Size {
+            String label;
+            String source;
+            int width;
+            int height;
+        }
+
+        class Sizes {
+            ArrayList<Size> size;
+        }
+
+        class GetSizesResult {
+            String stat;
+            Sizes sizes;
+        }
     }
 
-    static FlickrService.SearchResult search(@NonNull final String searchText) throws IOException {
-        final Map<String, String> options = new HashMap<String, String>(OPTIONS);
+    static String searchFirst(@NonNull final String searchText) throws IOException {
+        final Map<String, String> options = new HashMap<>(OPTIONS);
         options.put("method", "flickr.photos.search");
         options.put("per_page", "1");
         options.put("text", searchText);
@@ -54,7 +73,34 @@ public class FlickrClient {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
 
-        final FlickrService flickrService = retrofit.create(FlickrService.class);
-        return flickrService.searchFlickr(options).execute().body();
+        final Service service = retrofit.create(Service.class);
+        final Service.SearchResult result = service.search(options).execute().body();
+        if ("ok".equals(result.stat)) {
+            if (result.photos.total > 0) {
+                return result.photos.photo.get(0).id;
+            }
+        } else {
+            throw new IllegalStateException(result.stat);
+        }
+        return null;
+    }
+
+    static List<Service.Size> getSizes(@NonNull final String photoId) throws IOException {
+        final Map<String, String> options = new HashMap<>(OPTIONS);
+        options.put("method", "flickr.photos.getSizes");
+        options.put("photo_id", photoId);
+
+        final Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(FLICKR_BASEURL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build();
+
+        final Service service = retrofit.create(Service.class);
+        final Service.GetSizesResult result = service.getSizes(options).execute().body();
+        if ("ok".equals(result.stat)) {
+            return result.sizes.size;
+        } else {
+            throw new IllegalStateException(result.stat);
+        }
     }
 }
